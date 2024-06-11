@@ -406,7 +406,7 @@ p_perf <- (p_tree | p_tjurD|p_auc) + plot_layout(widths = c(0.12, 0.35,0.35),axe
 
 
 ```{r save-perfplot}
-ggsave(filename = here("plot_performance.pdf"), plot = p_perf, device = cairo_pdf, width = 8, height = 6.5)
+ggsave(filename = here("plots","plot_performance.pdf"), plot = p_perf, device = cairo_pdf, width = 8, height = 6.5)
 ```
 
 ### logOR of AUC-PR vs random baseline
@@ -696,7 +696,7 @@ p_beta2 <- (p_tree + p_local + p_local_grouped) +
 
 
 ```{r save-beta-local}
-ggsave(filename = here("data","plot_beta_local.pdf"), 
+ggsave(filename = here("plots","plot_beta_local.pdf"), 
        plot = p_beta2, device = cairo_pdf, width = 12, height = 8)
 ```
 
