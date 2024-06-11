@@ -1,0 +1,135 @@
+---
+title: "00 - Making phylogeny using the Open Tree of Life"
+format: html
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r load-packages}
+library(ape)
+library(ggtext)
+library(ggtree)
+library(patchwork)
+library(rgbif)
+library(rotl)
+library(tidyverse)
+library(here)
+```
+
+With this script, we're going to query the Open Tree of Life to get a phylogenetic tree combining all our species of interest. It will be used in our later analyses, but also as a figure in the finished manuscript.
+
+Let's start with importing the species list from the community data:
+
+```{r get-species-list}
+community <- read_csv(here("data", "Y_long_community.csv"))
+
+species_list <- community |>
+  select(species) |>
+  distinct()
+```
+
+Are the species names we used up-to-date based on GBIF Taxonomy Backbone?
+```{r check-gbif-names}
+names_gbif <- name_parse(species_list$species)
+
+table(names_gbif$scientificname == names_gbif$canonicalname)
+# 50/50 TRUE as of 2024-06-10
+```
+
+They seem so, great! Now we can try to match them to unique taxon ID in the Open Tree Of Life database
+
+```{r matching-names}
+names_matched <- tnrs_match_names(species_list$species, context_name = "Animals") |>
+  mutate(species = species_list$species)
+
+## everything matched well
+names_matched
+```
+
+Everything matched (great again!), but in a few cases, the main name in OTOL is actually a synonym of the name used in our community dataframe, which is the canonical name according to GBIF (see e.g. for snails, *Xeroplexa intersecta* in GBIF vs *Candidula intersecta* in OTOL).
+
+So we're going to need to overwrite the phylogeny tip names (which will use the OTOL names) with the canonical names for further analyses. No issue, it's easy. But first, we actually get our tree from OTOL:
+
+```{r making-trees}
+## using file argument to write tree directly to file keeps singletons, see ?tol_induced_subtree()
+## they're going to be useful to make a pretty plot
+## but we're gonna delete them for the tree actually used in analyses
+tol_induced_subtree(
+  ott_ids = names_matched$ott_id,
+  label_format = "name",
+  file = here("data", "trees", "raw_tree.newick")
+)
+
+raw_tree <- read.tree(here("data", "trees", "raw_tree.newick"))
+# double checking that no species were dropped when matching names; it can happen if species not yet in OTL
+length(raw_tree$tip.label) == length(species_list$species)
+```
+
+We can then rename the tips:
+```{r renaming-tips}
+relabeled_tree <- raw_tree
+# remove underscores from tip labels
+relabeled_tree$tip.label <- str_replace_all(relabeled_tree$tip.label, "_", " ")
+
+# re-order our names table in same order as tree tips
+names_matched_reordered <- arrange(names_matched, match(unique_name, relabeled_tree$tip.label))
+# replace synonym names with originals
+relabeled_tree$tip.label <- names_matched_reordered$species
+
+# saving cleaned tree
+ape::write.tree(relabeled_tree, file = here("data", "trees", "tree_relabeled_with_singletons.newick"))
+
+## checking the trees are the same except for the names:
+p1 <- ggtree(raw_tree) + geom_tiplab() + xlim(0, 100) + ggtitle("raw tree:")
+p2 <- ggtree(relabeled_tree) + geom_tiplab() + xlim(0, 100) + ggtitle("relabeled tree:")
+p1 | p2
+```
+
+
+```{r making-figure1}
+annotations <- data.frame(
+  node = c(
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Gastropoda"),
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Araneae"),
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Hemiptera"),
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Hymenoptera"),
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Coleoptera"),
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Diptera"),
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Myriapoda")
+  ),
+  taxon = c("Gastropoda", "Araneae", "Hemiptera", "Hymenoptera", "Coleoptera", "Diptera", "Myriapoda")
+)
+```
+These higher-level taxon annotations are why we needed to keep the internal singleton nodes for a bit, because as OTOL contains lots of clade levels, some major recognizable names may be singleton nodes in the subtree
+
+```{r making-figure1}
+tipnames_italic <- tibble(
+  label = relabeled_tree$tip.label,
+  names = paste0("*", relabeled_tree$tip.label, "*")
+)
+
+tree_to_plot <- full_join(relabeled_tree |>
+  compute.brlen(), tipnames_italic, by = "label")
+
+plot_tree <- ggtree(tree_to_plot) +
+  geom_richtext(
+    data = td_filter(isTip), aes(label = names),
+    label.color = NA, fill = NA, hjust = 0
+  ) +
+  xlim(0, 2.5) +
+  geom_highlight(data = annotations, aes(node = node, fill = taxon)) +
+  geom_cladelab(
+    data = annotations, mapping = aes(node = node, label = taxon, col = taxon),
+    offset = 0.9, offset.text = 0.05
+  ) +
+  geom_tree() + ## we replot the tree over the highlight
+  scale_fill_brewer("", palette = "Dark2") +
+  scale_color_brewer("", palette = "Dark2") +
+  theme(legend.position = "none")
+
+plot_tree
+```
+
+```{r save-tree-plot}
+ggsave(plot_tree, filename = here("plots", "Fig2.pdf"), device = cairo_pdf, width = 6, height = 7.5)
+```
