@@ -343,7 +343,7 @@ if (file.exists(here("models", "fits_CVfull.RDS"))) {
   starttime <- Sys.time()
 
   set.seed(42)
-  partition <- createPartition(mfull, nfolds = 4, column = "sample_ID")
+  partition <- createPartition(mfull, nfolds = 10, column = "sample_ID")
   preds_CVfull <- computePredictedValues(mfull, partition = partition, nParallel = 4)
 
   attr(preds_CVfull, "HMSCcrossval") <- TRUE
