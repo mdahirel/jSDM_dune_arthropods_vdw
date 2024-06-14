@@ -202,8 +202,8 @@ rSample <- HmscRandomLevel(units = XData$sample_ID) |>
 The default prior values for `a1` and `a2` are both 50 (see `str(rSample)` before `setPriors()`), setting them higher makes for emptier correlations (stronger shrinkage), see HMSC book. Models with prior values of 50 have major difficulties to converge with this model's structure and our data.
 
 ```{r model_full}
-if (file.exists(here("models", "mfull.RDS"))) {
-  mfull <- readRDS(here("models", "mfull.RDS"))
+if (file.exists(here("outputs", "mfull.RDS"))) {
+  mfull <- readRDS(here("outputs", "mfull.RDS"))
 } else {
   starttime <- Sys.time()
 
@@ -227,7 +227,7 @@ if (file.exists(here("models", "mfull.RDS"))) {
     transient = 15000,
     nParallel = 4
   )
-  saveRDS(mfull, file = here("models", "mfull.RDS"))
+  saveRDS(mfull, file = here("outputs", "mfull.RDS"))
 
   endtime <- Sys.time()
   endtime - starttime
@@ -337,8 +337,8 @@ occ_mfull$occ_avg
 As a trade-off between running time and need to have more folds, we use 4-fold cross-validation
 
 ```{r making-CVpreds}
-if (file.exists(here("models", "fits_CVfull.RDS"))) {
-  fits_CVfull <- readRDS(here("models", "fits_CVfull.RDS"))
+if (file.exists(here("outputs", "fits_CVfull.RDS"))) {
+  fits_CVfull <- readRDS(here("outputs", "fits_CVfull.RDS"))
 } else {
   starttime <- Sys.time()
 
@@ -350,7 +350,7 @@ if (file.exists(here("models", "fits_CVfull.RDS"))) {
 
   fits_CVfull <- HMSCfitted_CV(mfull, preds_CVfull)
 
-  saveRDS(fits_CVfull, file = here("models", "fits_CVfull.RDS"))
+  saveRDS(fits_CVfull, file = here("outputs", "fits_CVfull.RDS"))
 
   endtime <- Sys.time()
   endtime - starttime
@@ -361,8 +361,23 @@ if (file.exists(here("models", "fits_CVfull.RDS"))) {
 
 We compute out-of-sample model performance metrics on the *cross-validated* predictions
 ```{r perf-metrics}
-tjur_CVfull <- HMSCtjurD(fits_CVfull)
-PRAUC_CVfull <- HMSCauc(fits_CVfull,auc_type="PR")
+if (file.exists(here("outputs", "tjur_CVfull.RDS"))) {
+  tjur_CVfull <- readRDS(here("outputs", "tjur_CVfull.RDS"))
+} else {
+  tjur_CVfull <- HMSCtjurD(fits_CVfull)
+
+  saveRDS(tjur_CVfull, file = here("outputs", "tjur_CVfull.RDS"))
+}
+
+if (file.exists(here("outputs", "PRAUC_CVfull.RDS"))) {
+  PRAUC_CVfull <- readRDS(here("outputs", "PRAUC_CVfull.RDS"))
+} else {
+  PRAUC_CVfull <- HMSCauc(fits_CVfull, auc_type = "PR")
+
+  saveRDS(PRAUC_CVfull, file = here("outputs", "PRAUC_CVfull.RDS"))
+}
+
+
 ```
 
 ```{r check-tjur}
@@ -919,7 +934,12 @@ We end up with a grouped tibble with a list-column `data` that contains for each
 For each posterior sample x latent factor, we then estimate the correlogram (by increments of 5 km)...
 
 ```{r make-correlograms}
-starttime <- Sys.time()
+if (file.exists(here("outputs", "Eta_correlogs.RDS"))) {
+  Eta_correlogs <- readRDS(here("outputs", "Eta_correlogs.RDS"))
+} else {
+
+  starttime <- Sys.time()
+  
 Eta_correlogs <- Etas |>
   mutate(correl = map(
     .x = data,
@@ -944,6 +964,8 @@ endtime <- Sys.time()
 endtime - starttime
 
 # takes about 1-2 hours
+  saveRDS(Eta_correlogs, file = here("outputs", "Eta_correlogs.RDS"))
+}
 ```
 
 ... which we then plot, using the posteriors to show the uncertainty:
