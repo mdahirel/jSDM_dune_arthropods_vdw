@@ -131,5 +131,5 @@ plot_tree
 ```
 
 ```{r save-tree-plot}
-ggsave(plot_tree, filename = here("plots", "Fig2.pdf"), device = cairo_pdf, width = 6, height = 7.5)
+ggsave(plot_tree, filename = here("plots", "Fig2_phylogeny.pdf"), device = cairo_pdf, width = 6, height = 7.5)
 ```
