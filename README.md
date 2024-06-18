@@ -1,8 +1,10 @@
 # A joint Species distribution Model applied to marram grass-associated arthropods
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.12079615.svg)](https://doi.org/10.5281/zenodo.12079615)
+
 This repository contains all data and code needed to re-do the analyses and figures in our upcoming manuscript
 
-"Dissecting the drivers of plant-associated invertebrate community structure: the importance of heterogeneity at multiple scales" (by Ruben Van De Walle, Maxime Dahirel, Ward Langeraert, Dries Benoit, Pieter Vantieghem, Martijn L. Vandegehuchte, François Massol, Dries Bonte)
+"Drivers of plant-associated invertebrate community structure in coastal dunes" (by Ruben Van De Walle, Maxime Dahirel, Ward Langeraert, Dries Benoit, Pieter Vantieghem, Martijn L. Vandegehuchte, François Massol, Dries Bonte)
 
 link to preprint: upcoming
 
