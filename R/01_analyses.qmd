@@ -328,6 +328,27 @@ if (file.exists(here("outputs", "PRAUC_CVfull.RDS"))) {
 }
 ```
 
+For comparison, let's also calculate the performance metrics on the training set:
+
+```{r perf-metrics-training}
+if (file.exists(here("outputs", "tjur_mfull.RDS"))) {
+  tjur_mfull <- readRDS(here("outputs", "tjur_mfull.RDS"))
+} else {
+  tjur_mfull <- HMSCtjurD(fits_mfull)
+
+  saveRDS(tjur_mfull, file = here("outputs", "tjur_mfull.RDS"))
+}
+
+
+if (file.exists(here("outputs", "PRAUC_mfull.RDS"))) {
+  PRAUC_mfull <- readRDS(here("outputs", "PRAUC_mfull.RDS"))
+} else {
+  PRAUC_mfull <- HMSCauc(fits_mfull, auc_type = "PR")
+
+  saveRDS(PRAUC_mfull, file = here("outputs", "PRAUC_mfull.RDS"))
+}
+```
+
 
 ## 3C - variance partitioning
 
