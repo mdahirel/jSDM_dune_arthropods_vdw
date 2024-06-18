@@ -1,5 +1,5 @@
 ---
-title: "01 - analyses"
+title: "02 - plots"
 format: html
 editor_options: 
   chunk_output_type: console
