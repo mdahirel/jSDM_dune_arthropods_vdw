@@ -70,9 +70,9 @@ p_tree <- ggtree(tree_for_plot)
 # Occurrence predictions
 
 ```{r occurrences}
-occ_mfull$occ |> print(n=Inf)
+occ_mfull$occ |> print(n = Inf)
 
-occ_CVfull$occ |> print(n=Inf)
+occ_CVfull$occ |> print(n = Inf)
 
 occ_mfull$occ_avg
 
@@ -91,51 +91,57 @@ summary_mfull |>
 # Figure 3: model performance metrics
 
 ```{r perfplot}
-fitmetrics <- tjur_CVfull$tjurD_per_species |> 
-  select(species, TjurD, D.lower=.lower,D.upper=.upper) |> 
+fitmetrics <- tjur_CVfull$tjurD_per_species |>
+  select(species, TjurD, D.lower = .lower, D.upper = .upper) |>
   left_join(
-    PRAUC_CVfull$AUC_per_species|> 
-      select(species, AUC, AUC.lower=.lower,AUC.upper=.upper)
-    )|>
-  left_join(occ_mfull$occ |> select(species,occurrence_obs)) |>
+    PRAUC_CVfull$AUC_per_species |>
+      select(species, AUC, AUC.lower = .lower, AUC.upper = .upper)
+  ) |>
+  left_join(occ_mfull$occ |> select(species, occurrence_obs)) |>
   mutate(species = paste0("*", species, "*") |>
     str_replace("_", " ")) |>
   mutate(species = fct_relevel(as.factor(species), rev(get_taxa_name(p_tree))))
 
 p_tjurD <- ggplot(fitmetrics) +
-  geom_segment(aes(y = species, x = D.lower, xend = D.upper, col = D.lower>0), linewidth = 3) +
-  scale_colour_manual(values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340"))+
+  geom_segment(aes(y = species, x = D.lower, xend = D.upper, col = D.lower > 0), linewidth = 3) +
+  scale_colour_manual(values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340")) +
   geom_point(aes(y = species, x = TjurD)) +
   scale_y_discrete(name = "") +
   scale_x_continuous(name = "Tjur's *D*") +
   theme_bw() +
-  theme(axis.text.y = element_markdown(), 
-        axis.title.x = element_markdown(),legend.position = "none")
+  theme(
+    axis.text.y = element_markdown(),
+    axis.title.x = element_markdown(), legend.position = "none"
+  )
 
 p_auc <- ggplot(fitmetrics) +
-  geom_segment(aes(y = species, x = AUC.lower, xend = AUC.upper, col = AUC.lower>occurrence_obs), linewidth = 3) +
-  scale_colour_manual(values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340"))+
-  geom_segment(aes(y = as.numeric(species)-0.5, yend = as.numeric(species)+0.5,
-                   x = occurrence_obs, xend= occurrence_obs)) +
+  geom_segment(aes(y = species, x = AUC.lower, xend = AUC.upper, col = AUC.lower > occurrence_obs), linewidth = 3) +
+  scale_colour_manual(values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340")) +
+  geom_segment(aes(
+    y = as.numeric(species) - 0.5, yend = as.numeric(species) + 0.5,
+    x = occurrence_obs, xend = occurrence_obs
+  )) +
   geom_point(aes(y = species, x = AUC)) +
   scale_y_discrete(name = "") +
   scale_x_continuous(name = "AUC-PR") +
   theme_bw() +
-  theme(axis.text.y = element_markdown(), 
-        axis.title.x = element_markdown(),legend.position = "none")
+  theme(
+    axis.text.y = element_markdown(),
+    axis.title.x = element_markdown(), legend.position = "none"
+  )
 
-p_perf <- (p_tree | p_tjurD|p_auc) + plot_layout(widths = c(0.15, 0.42,0.42),axes = "collect")
+p_perf <- (p_tree | p_tjurD | p_auc) + plot_layout(widths = c(0.15, 0.42, 0.42), axes = "collect")
 ```
 
 
 ```{r save-perfplot}
-ggsave(filename = here("plots","Fig3_performance.pdf"), plot = p_perf, device = cairo_pdf, width = 7.5, height = 6)
+ggsave(filename = here("plots", "Fig3_performance.pdf"), plot = p_perf, device = cairo_pdf, width = 7.5, height = 6)
 ```
 
 # Figure 4: variation partitioning
 
 ```{r varpart-summary}
-varpart <- varpart |> 
+varpart <- varpart |>
   mutate(species = fct_relevel(as.factor(species), rev(get_taxa_name(p_tree))))
 
 varpart |>
@@ -179,7 +185,7 @@ p_VC <- (p_tree | p_V) + plot_layout(widths = c(0.2, 0.8), guides = "collect") &
 ```
 
 ```{r save-varpart-plot}
-ggsave(filename = here("plots","Fig4_variance_comps.pdf"), plot = p_VC, device = cairo_pdf, width = 6, height = 6.5)
+ggsave(filename = here("plots", "Fig4_variance_comps.pdf"), plot = p_VC, device = cairo_pdf, width = 6, height = 6.5)
 ```
 
 # Figures 5 & 6: Local and district niches (Beta coefficients)
@@ -230,11 +236,11 @@ p_beta_district_grouped <- betas_grouped |>
   mutate(is_non_zero = sign(q2.5) == sign(q97.5)) |>
   filter(str_detect(coef, "district")) |>
   mutate(coef = str_remove(coef, "district")) |>
-  mutate(coef= case_when(
-    coef=="UK-N" ~ "Norfolk",
-    coef=="UK-S" ~ "N. Devon",
-    TRUE~ coef
-  )) |> 
+  mutate(coef = case_when(
+    coef == "UK-N" ~ "Norfolk",
+    coef == "UK-S" ~ "N. Devon",
+    TRUE ~ coef
+  )) |>
   ggplot() +
   geom_segment(aes(y = group, x = q2.5, xend = q97.5, col = is_non_zero), linewidth = 3) +
   geom_point(aes(y = group, x = mean, fill = is_non_zero), pch = 21) +
@@ -245,7 +251,7 @@ p_beta_district_grouped <- betas_grouped |>
   geom_vline(xintercept = 0, linetype = 2) +
   facet_grid(cols = vars(coef)) +
   theme_bw() +
-  theme(axis.text.y = element_markdown()) +
+  theme(axis.text.y = element_markdown(), legend.position = "none") +
   coord_cartesian(xlim = c(-5, 2))
 ```
 
@@ -253,10 +259,10 @@ p_beta_district_grouped <- betas_grouped |>
 betas_district <- betas |>
   filter(str_detect(coef, "district")) |>
   mutate(coef = str_remove(coef, "district")) |>
-  mutate(coef= case_when(
-    coef=="UK-N" ~ "Norfolk",
-    coef=="UK-S" ~ "N. Devon",
-    TRUE~ coef
+  mutate(coef = case_when(
+    coef == "UK-N" ~ "Norfolk",
+    coef == "UK-S" ~ "N. Devon",
+    TRUE ~ coef
   )) |>
   mutate(species = fct_relevel(as.factor(species), rev(get_taxa_name(p_tree))))
 ## needs to be reverse order because of how usual ggplot plots factors on y (bottom to top)
@@ -273,7 +279,7 @@ p_beta_district <- ggplot(betas_district) +
   coord_cartesian(xlim = c(-5, 2)) +
   ggtitle(label = "District-level contrasts (vs. reference level: Flemish dunes)") +
   theme_bw() +
-  theme(axis.text.y = element_markdown())
+  theme(axis.text.y = element_markdown(), legend.position = "none")
 ```
 
 
@@ -291,8 +297,10 @@ p_beta1 <- (p_tree + p_beta_district + p_beta_district_grouped) +
 
 
 ```{r save-beta-district}
-ggsave(filename = here("plots","Fig5_beta_district.pdf"), 
-       plot = p_beta1, device = cairo_pdf, width = 10, height = 8)
+ggsave(
+  filename = here("plots", "Fig5_beta_district.pdf"),
+  plot = p_beta1, device = cairo_pdf, width = 10, height = 8
+)
 ```
 
 
@@ -325,7 +333,8 @@ p_local_grouped <- betas_grouped |>
   theme_bw() +
   theme(
     axis.text.y = element_markdown(),
-    strip.text = element_markdown()
+    strip.text = element_markdown(),
+    legend.position = "none"
   ) +
   coord_cartesian(xlim = c(-2, 2))
 ```
@@ -359,7 +368,8 @@ p_local <- ggplot(betas_local) +
   theme_bw() +
   theme(
     axis.text.y = element_markdown(),
-    strip.text = element_markdown()
+    strip.text = element_markdown(),
+    legend.position = "none"
   ) +
   coord_cartesian(xlim = c(-2, 2))
 ```
@@ -379,8 +389,10 @@ p_beta2 <- (p_tree + p_local + p_local_grouped) +
 
 
 ```{r save-beta-local}
-ggsave(filename = here("plots","Fig6_beta_local.pdf"), 
-       plot = p_beta2, device = cairo_pdf, width = 11.5, height = 8)
+ggsave(
+  filename = here("plots", "Fig6_beta_local.pdf"),
+  plot = p_beta2, device = cairo_pdf, width = 11.5, height = 8
+)
 ```
 
 # Figures 7 and 8: Traits effects on species niches (Gamma coefficients)
@@ -412,34 +424,42 @@ gammas <- summary_mfull |>
 ```{r p-gamma-district}
 gammas_district <- gammas |>
   filter(str_detect(coef, "district")) |>
-  mutate(coef = str_remove(coef, "district"))|>
-  mutate(coef= case_when(
-    coef=="UK-N" ~ "Norfolk",
-    coef=="UK-S" ~ "N. Devon",
-    TRUE~ coef
-  )) |> 
-  mutate(is_non_zero=factor(is_non_zero,levels=c("FALSE","TRUE")))
+  mutate(coef = str_remove(coef, "district")) |>
+  mutate(coef = case_when(
+    coef == "UK-N" ~ "Norfolk",
+    coef == "UK-S" ~ "N. Devon",
+    TRUE ~ coef
+  )) |>
+  mutate(is_non_zero = factor(is_non_zero, levels = c("FALSE", "TRUE")))
 
 p_gamma1 <- ggplot(gammas_district) +
-  geom_segment(aes(y = trait, x = q2.5, xend = q97.5, col = is_non_zero), linewidth = 3,
-               show.legend = c(col=TRUE)) +
-  geom_point(aes(y = trait, x = mean, fill = is_non_zero), pch = 21, show.legend = c(fill=TRUE)) +
+  geom_segment(aes(y = trait, x = q2.5, xend = q97.5, col = is_non_zero),
+    linewidth = 3,
+    show.legend = c(col = TRUE)
+  ) +
+  geom_point(aes(y = trait, x = mean, fill = is_non_zero), pch = 21, show.legend = c(fill = TRUE)) +
   scale_y_discrete(name = "") +
-  scale_colour_manual(name = "CI95 ≠ 0?", values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340"),
-                      drop=FALSE) +
-  scale_fill_manual(name = "CI95 ≠ 0?", values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340"),
-                    drop=FALSE) +
+  scale_colour_manual(
+    name = "CI95 ≠ 0?", values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340"),
+    drop = FALSE
+  ) +
+  scale_fill_manual(
+    name = "CI95 ≠ 0?", values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340"),
+    drop = FALSE
+  ) +
   scale_x_continuous("Posterior coefficient (mean and 95% credible interval)") +
   geom_vline(xintercept = 0, linetype = 2) +
   facet_grid(cols = vars(coef)) +
   ggtitle(label = "District-level contrasts (vs. reference level: Flemish dunes)") +
   theme_bw() +
-  theme(axis.text.y = element_markdown())
+  theme(axis.text.y = element_markdown(), legend.position = "none")
 ```
 
 ```{r save-gamma-district}
-ggsave(filename = here("plots","Fig7_gamma_district.pdf"), 
-       plot = p_gamma1, device = cairo_pdf, width = 8, height = 3.5)
+ggsave(
+  filename = here("plots", "Fig7_gamma_district.pdf"),
+  plot = p_gamma1, device = cairo_pdf, width = 8, height = 3.5
+)
 ```
 
 ## Figure 8: gamma coefficients, local environmental variables
@@ -471,13 +491,16 @@ p_gamma2 <- ggplot(gammas_local) +
   theme_bw() +
   theme(
     axis.text.y = element_markdown(),
-    strip.text = element_markdown()
+    strip.text = element_markdown(),
+    legend.position = "none"
   )
 ```
 
 ```{r save-gamma-local}
-ggsave(filename = here("plots","Fig8_gamma_local.pdf"), 
-       plot = p_gamma2, device = cairo_pdf, width = 11.5, height = 3.5)
+ggsave(
+  filename = here("plots", "Fig8_gamma_local.pdf"),
+  plot = p_gamma2, device = cairo_pdf, width = 9.5, height = 4
+)
 ```
 
 # Figure 9: "residual" correlation matrix
@@ -538,7 +561,7 @@ p_cors <- ggcorrplot(cov2cor(covmat),
 ```
 
 ```{r save-plot-rescors}
-ggsave(filename = here("plots","Fig9_rescor_matrix.pdf"), plot = p_cors, device = cairo_pdf, width = 8, height = 8)
+ggsave(filename = here("plots", "Fig9_rescor_matrix.pdf"), plot = p_cors, device = cairo_pdf, width = 8, height = 8)
 ```
 
 # Supplementary Figures
@@ -571,14 +594,14 @@ p_bulk <- summary_relettered |> filter(!is.na(ess_bulk)) |> # slot sigma is NA f
   geom_hline(yintercept = 400, linetype = 2) +
   scale_x_discrete("") +
   scale_y_continuous("*ESS<sub>bulk</sub>*", limits = c(0, 5000)) +
-  facet_grid(cols = vars(fixed_or_random), scales = "free_x", space = "free_x")+
-    theme_bw() +
-    theme(
-      axis.text.x = element_markdown(),
-      axis.text.y = element_markdown(),
-      strip.text = element_markdown(),
-      title = element_markdown(),
-    )
+  facet_grid(cols = vars(fixed_or_random), scales = "free_x", space = "free_x") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_markdown(),
+    axis.text.y = element_markdown(),
+    strip.text = element_markdown(),
+    title = element_markdown(),
+  )
 
 p_tail <- summary_relettered |>
   filter(!is.na(ess_tail)) |>
@@ -587,14 +610,14 @@ p_tail <- summary_relettered |>
   geom_hline(yintercept = 400, linetype = 2) +
   scale_x_discrete("") +
   scale_y_continuous("*ESS<sub>tail</sub>*", limits = c(0, 5000)) +
-  facet_grid(cols = vars(fixed_or_random), scales = "free_x", space = "free_x")+
-    theme_bw() +
-    theme(
-      axis.text.x = element_markdown(),
-      axis.text.y = element_markdown(),
-      strip.text = element_markdown(),
-      title = element_markdown(),
-    )
+  facet_grid(cols = vars(fixed_or_random), scales = "free_x", space = "free_x") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_markdown(),
+    axis.text.y = element_markdown(),
+    strip.text = element_markdown(),
+    title = element_markdown(),
+  )
 
 p_rhat <- summary_relettered |>
   filter(!is.na(rhat)) |>
@@ -602,17 +625,17 @@ p_rhat <- summary_relettered |>
   geom_boxplot(aes(parameter_type, rhat)) +
   geom_hline(yintercept = 1.01, linetype = 2) +
   scale_x_discrete("Parameter type") +
-  scale_y_continuous(expression(italic(widehat(R))),limits = c(0.998, 1.012)) +
+  scale_y_continuous(expression(italic(widehat(R))), limits = c(0.998, 1.012)) +
   facet_grid(cols = vars(fixed_or_random), scales = "free_x", space = "free_x") +
-    theme_bw() +
-    theme(
-      axis.text.x = element_markdown(),
-      strip.text = element_markdown()
-    )
+  theme_bw() +
+  theme(
+    axis.text.x = element_markdown(),
+    strip.text = element_markdown()
+  )
 
 
 p_diag <- (
-  (p_bulk / p_tail / p_rhat) 
+  (p_bulk / p_tail / p_rhat)
 ) +
   plot_layout(axis_titles = "collect")
 ```
@@ -627,19 +650,23 @@ ggsave(filename = here("plots", "Splot_model_diagnostics.pdf"), plot = p_diag, d
 the random baseline for AUC-PR varies between species, as it is the observed prevalence. We can attempt to standardise by looking at the logit(AUC) - logit(prevalence) values
 
 ```{r plot-logOR-auc}
-p_logOR  <- ggplot(fitmetrics) +
-  geom_segment(aes(y = species, x = qlogis(AUC.lower)-qlogis(occurrence_obs), 
-                   xend = qlogis(AUC.upper)-qlogis(occurrence_obs), 
-                   col = AUC.lower > occurrence_obs), linewidth = 3) +
-  scale_colour_manual(values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340"))+
-  geom_point(aes(y = species, x = qlogis(AUC)-qlogis(occurrence_obs))) +
+p_logOR <- ggplot(fitmetrics) +
+  geom_segment(aes(
+    y = species, x = qlogis(AUC.lower) - qlogis(occurrence_obs),
+    xend = qlogis(AUC.upper) - qlogis(occurrence_obs),
+    col = AUC.lower > occurrence_obs
+  ), linewidth = 3) +
+  scale_colour_manual(values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340")) +
+  geom_point(aes(y = species, x = qlogis(AUC) - qlogis(occurrence_obs))) +
   scale_y_discrete(name = "") +
   scale_x_continuous(name = "logit(AUC-PR) - logit(observed occurrence)") +
   theme_bw() +
-  theme(axis.text.y = element_markdown(), axis.title.x = element_markdown(),
-        legend.position="none")
+  theme(
+    axis.text.y = element_markdown(), axis.title.x = element_markdown(),
+    legend.position = "none"
+  )
 
-p_logORauc <- (p_tree | p_logOR) + plot_layout(widths = c(0.25,0.75))
+p_logORauc <- (p_tree | p_logOR) + plot_layout(widths = c(0.25, 0.75))
 ```
 
 ```{r save-splots-logOR-auc}
@@ -653,18 +680,18 @@ ggsave(filename = here("plots", "Splot_logOR_AUC.pdf"), plot = p_logORauc, devic
 # a quick check on how the correlations that are different from 0 are distributed,
 # since their mean posterior values seem quite grouped/homogenous on the above plot
 
-p_corcheck <- tibble(cor=c(cov2cor(covmat)),p=c(pmat),lower.tri=c(lower.tri(covmat))) |> 
+p_corcheck <- tibble(cor = c(cov2cor(covmat)), p = c(pmat), lower.tri = c(lower.tri(covmat))) |>
   filter(lower.tri) |> # avoid duplicates + removes the main diagonal which is obviously all 1s
-  mutate(p = (p==0)) |> 
-  ggplot()+
-  geom_density(aes(abs(cor),fill=factor(p)),alpha=0.5)+
-  scale_x_continuous("absolute value of posterior mean correlation")+
-  scale_fill_manual(name = "CI95 ≠ 0?", values = c(`TRUE` = "#f1a340",`FALSE` = "lightgrey"))+
+  mutate(p = (p == 0)) |>
+  ggplot() +
+  geom_density(aes(abs(cor), fill = factor(p)), alpha = 0.5) +
+  scale_x_continuous("absolute value of posterior mean correlation") +
+  scale_fill_manual(name = "CI95 ≠ 0?", values = c(`TRUE` = "#f1a340", `FALSE` = "lightgrey")) +
   theme_bw()
 ```
 
 ```{r save-plot-rescors}
-ggsave(filename = here("plots","Splot_correlation_magnitude.pdf"), plot = p_corcheck, device = cairo_pdf, width = 4, height = 4)
+ggsave(filename = here("plots", "Splot_correlation_magnitude.pdf"), plot = p_corcheck, device = cairo_pdf, width = 4, height = 4)
 ```
 
 ## Spatial correlation in site loadings
@@ -695,5 +722,5 @@ p_correlog <- Eta_correlogs |>
 ```
 
 ```{r save-plot-correlog}
-ggsave(filename = here("plots","Splot_correlog_5km.pdf"), plot = p_correlog, device = cairo_pdf, width = 5, height = 5)
+ggsave(filename = here("plots", "Splot_correlog_5km.pdf"), plot = p_correlog, device = cairo_pdf, width = 5, height = 5)
 ```
