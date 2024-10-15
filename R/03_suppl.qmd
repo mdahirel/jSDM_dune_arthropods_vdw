@@ -1,0 +1,64 @@
+---
+title: "Looking at climate differences between districts"
+format: html
+editor_options: 
+  chunk_output_type: console
+---
+
+While districts do not only differ in climate but also (maybe more importantly) by geology, hence why we run analyses at the district level rather than using climate variables, it is still nice to look at how exactly they differ re: climate
+
+We made averaged climate maps over the 1989-2018 30-year period using CHELSA (v2.1, https://chelsa-climate.org/), and sampled these maps at our community samples locations. We'll do some descriptive boxplots of these sampled values here
+
+```{r}
+library(tidyverse)
+library(here)
+```
+
+```{r}
+data_clim <- read_csv(here("data", "CHELSA_means_1989_2018_vdw.csv"))
+raw_envt <- read_csv(here("data", "data_vars.csv"))
+```
+
+
+```{r}
+p_clim <- data_clim |> 
+  left_join(raw_envt |> select(sample_ID,transect,district)) |> 
+  pivot_longer(cols=c(sfcWind_max:tmin)) |> 
+  mutate(name=fct_relevel(name,"tmp","tmax","tmin","pr","sfcWind","sfcWind_max")) |> 
+  mutate(
+    name=fct_recode(
+      name,
+      `Average temperature (°C)`="tmp",
+      `Average maximal temperature of warmest month (°C)`="tmax",
+      `Average minimal temperature of coldest month (°C)`="tmin",
+      `Annual precipitation (mm/yr)`="pr",
+      `Average wind speed (m/s)`="sfcWind",
+      `Average wind speed of windiest month (m/s)`="sfcWind_max"
+      ),
+    district=fct_recode(
+      district,
+      `N. Devon` = "UK-S", Norfolk = "UK-N"
+    )
+  )|> 
+  mutate(district=fct_relevel(
+    district,"Boulonnais","N. Devon","Flemish dunes","Renodunaal","Wadden","Norfolk"
+  )) |> # reordering roughly by latitude
+  ggplot()+
+  geom_boxplot(aes(district,value))+
+  scale_y_continuous("")+
+  facet_wrap(~name,scales = "free_y",ncol=2)+
+  theme_bw()
+
+```
+
+take-home messages:
+
+- overall latitudinal gradient in mean T°C
+- annual variation in temperature (tmax-tmin) less marked in UK sites than Europe mainland
+- no clear precipitation pattern
+- northern sites seem windier
+
+
+```{r save-splots-diags}
+ggsave(filename = here("plots", "Splot_climate_district.pdf"), plot = p_clim, device = cairo_pdf, width = 8, height = 6)
+```

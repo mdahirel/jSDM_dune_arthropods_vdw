@@ -1,0 +1,388 @@
+---
+title: "01b - refitting jSDM separately by phylum"
+format: html
+editor_options: 
+  chunk_output_type: console
+---
+
+Following a reviewer's suggestion, we explore whether the detected phylogenetic signal might be mostly due to the Arthropod/Mollusca contrast by refitting the jSDM by phylum to get separate phylogenetic signals estimates for each.
+
+For details on the analysis, see file `01_analyses.qmd`
+
+```{r load-packages}
+library(ape)
+library(coda)
+library(conflicted)
+library(datawizard)
+library(ggtext)
+library(Hmsc)
+library(ncf)
+library(patchwork)
+library(phytools)
+library(posterior)
+library(tidybayes)
+library(tidyverse)
+
+library(here)
+```
+
+```{r load-custom-functions}
+HMSCfunctions <- list.files(here("R", "tidyHMSC"), pattern = "*.R")
+
+for (i in 1:length(HMSCfunctions)) {
+  source(here("R", "tidyHMSC", HMSCfunctions[i]))
+}
+```
+
+```{r solve-conflicts}
+conflict_scout()
+conflicted::conflict_prefer_all("purrr", quiet = TRUE) # avoid a map() conflict with a dependency of phytools
+conflicted::conflict_prefer_all("dplyr", quiet = TRUE)
+```
+
+
+# Part 1: Formatting datasets for analyses
+
+```{r load-raw-data}
+raw_community <- read_csv(here("data", "Y_long_community.csv"))
+raw_trait_data <- read_csv(here("data", "traits.csv"))
+raw_envt <- read_csv(here("data", "data_vars.csv"))
+raw_tree <- read.tree(here("data", "trees", "tree_relabeled_with_singletons.newick"))
+```
+
+## Tree data
+
+```{r tree-branch-lengths}
+phylotree <- raw_tree |>
+  collapse.singles() |>
+  compute.brlen(method = "Grafen")
+```
+
+
+```{r split-trees-branch-lengths}
+phylotree_arthro <- extract.clade(raw_tree,"Arthropoda")|>
+  collapse.singles() |>
+  compute.brlen(method = "Grafen")
+
+phylotree_mollusca <- extract.clade(raw_tree,"Mollusca")|>
+  collapse.singles() |>
+  compute.brlen(method = "Grafen")
+
+```
+
+## Community data
+
+```{r make-YData}
+community_wide <- raw_community |>
+  mutate(species = str_replace_all(species, " ", "_")) |>
+  arrange(sample_ID, species) |>
+  pivot_wider(names_from = species, values_from = presence)
+
+YData <- community_wide |>
+  select(-sample_ID) |>
+  as.data.frame()
+
+row.names(YData) <- community_wide$sample_ID
+```
+
+
+```{r split-YData}
+YData_arthro <- YData |>
+  select(phylotree_arthro$tip.label) |> 
+  as.matrix()
+
+YData_arthro <- YData_arthro[,sort(colnames(YData_arthro))]
+YData_arthro <- YData_arthro[rowSums(YData_arthro)>0,]
+
+YData_mollusca <- YData |>
+  select(phylotree_mollusca$tip.label) |> 
+  as.matrix()
+
+
+YData_mollusca <- YData_mollusca[,sort(colnames(YData_mollusca))]
+YData_mollusca <- YData_mollusca[rowSums(YData_mollusca)>0,]
+```
+
+## Trait data
+
+```{r make-TrData}
+TrData <- raw_trait_data |>
+  mutate(species = str_replace_all(species, " ", "_")) |>
+  arrange(species) |>
+  mutate(log10size = log(size_mm, 10)) |>
+  standardize(append = "_scaled") |>
+  mutate(trophic_level_adult = fct_relevel(
+    trophic_level_adult,
+    c("Herbivore", "Predator", "Detritivore", "Omnivore")
+  )) |>
+  mutate(trophic_level_larva = fct_relevel(
+    trophic_level_larva,
+    c("Herbivore", "Predator", "Detritivore", "Omnivore")
+  )) |>
+  as.data.frame()
+
+row.names(TrData) <- TrData$species
+```
+
+```{r split-Trdata}
+TrData_arthro <- TrData[which(row.names(TrData) %in% phylotree_arthro$tip.label),]
+
+TrData_mollusca <- TrData[which(row.names(TrData) %in% phylotree_mollusca$tip.label),]
+```
+
+## Environmental data
+
+```{r make-XData}
+XData <- raw_envt |>
+  arrange(sample_ID) |>
+  mutate(vitalityF = case_when(
+    vitality < 2 ~ "0_1",
+    TRUE ~ as.character(vitality)
+  ), .after = vitality) |>
+  mutate(vitalityF = fct_relevel(vitalityF, c("4", "3", "2", "0_1"))) |>
+  mutate(district = fct_relevel(district, "Flemish dunes", after = 0)) |>
+  standardize(append = "_scaled") |>
+  mutate(dupe = duplicated(data.frame(X, Y))) |> # 2 samples have same coordinates as 2 other (presumably nearby)
+  mutate(
+    sample_ID = factor(sample_ID),
+    transect = factor(transect),
+    country = factor(country)
+  ) |> # Hmsc() doesn't like variables as character in this dataframe, even if not used in formula
+  as.data.frame()
+
+row.names(XData) <- XData$sample_ID
+```
+
+```{r}
+XData_arthro <- XData[which(rownames(XData) %in% rownames(YData_arthro)),] |> 
+  mutate(district=fct_drop(district),
+         vitalityF=fct_drop(vitalityF),
+         sample_ID=fct_drop(sample_ID),
+         transect = fct_drop(transect),
+         country=fct_drop(country))
+
+XData_mollusca <- XData[which(rownames(XData) %in% rownames(YData_mollusca)),]|> 
+  mutate(district=fct_drop(district),
+         vitalityF=fct_drop(vitalityF),
+         sample_ID=fct_drop(sample_ID),
+         transect = fct_drop(transect),
+         country=fct_drop(country))
+```
+
+```{r}
+table(rownames(XData_mollusca)==rownames(YData_mollusca))
+table(rownames(XData_mollusca)==rownames(YData_mollusca))
+```
+
+# Part 2: the models
+
+## Model formulas
+
+```{r XFormula}
+XFormula <- ~ vitalityF + district +
+  proportion_50_scaled + I(proportion_50_scaled^2) + mt_stat_50_scaled
+```
+
+```{r TrFormulas-split}
+TrFormula_arthro <- ~ trophic_level_adult + log10size_scaled
+TrFormula_mollusca <- ~ log10size_scaled
+```
+
+We remove the trophic level from the mollusca model since they are all herbivores
+
+## Making the model
+
+```{r random-effects-structure}
+studyDesign_mollusca <- XData_mollusca |> select(sample_ID)
+rSample_mollusca <- HmscRandomLevel(units = XData_mollusca$sample_ID) |>
+  setPriors(a1 = 60, a2 = 60)
+
+studyDesign_arthro <- XData_arthro |> select(sample_ID)
+rSample_arthro <- HmscRandomLevel(units = XData_arthro$sample_ID) |>
+  setPriors(a1 = 60, a2 = 60)
+```
+
+```{r model_mollusca}
+if (file.exists(here("outputs", "mmollusca.RDS"))) {
+  mmollusca <- readRDS(here("outputs", "mmollusca.RDS"))
+} else {
+  starttime <- Sys.time()
+
+  mmollusca <- Hmsc(
+    Y = YData_mollusca,
+    XData = XData_mollusca,
+    XFormula = XFormula,
+    TrData = TrData_mollusca,
+    TrFormula = TrFormula_mollusca,
+    phyloTree = phylotree_mollusca,
+    studyDesign = studyDesign_mollusca,
+    ranLevels = list("sample_ID" = rSample_mollusca),
+    distr = "probit"
+  )
+
+  set.seed(42)
+  mmollusca <- sampleMcmc(mmollusca,
+    nChains = 4,
+    thin = 100,
+    samples = 1000,
+    transient = 25000,
+    nParallel = 4
+  )
+  saveRDS(mmollusca, file = here("outputs", "mmollusca.RDS"))
+
+  endtime <- Sys.time()
+  endtime - starttime
+}
+## model takes around 10 mins to run
+```
+
+
+```{r model_arthro}
+if (file.exists(here("outputs", "marthro.RDS"))) {
+  marthro <- readRDS(here("outputs", "marthro.RDS"))
+} else {
+  starttime <- Sys.time()
+
+  marthro <- Hmsc(
+    Y = YData_arthro,
+    XData = XData_arthro,
+    XFormula = XFormula,
+    TrData = TrData_arthro,
+    TrFormula = TrFormula_arthro,
+    phyloTree = phylotree_arthro,
+    studyDesign = studyDesign_arthro,
+    ranLevels = list("sample_ID" = rSample_arthro),
+    distr = "probit"
+  )
+
+  set.seed(42)
+  marthro <- sampleMcmc(marthro,
+    nChains = 4,
+    thin = 100,
+    samples = 1000,
+    transient = 25000,
+    nParallel = 4
+  )
+  saveRDS(marthro, file = here("outputs", "marthro.RDS"))
+
+  endtime <- Sys.time()
+  endtime - starttime
+}
+## model takes about 2-5 hours to run
+```
+
+## Basic model diagnostics
+
+```{r HSMCsummary}
+if (file.exists(here("outputs", "summary_mmollusca.RDS"))) {
+  summary_mmollusca <- readRDS(here("outputs", "summary_mmollusca.RDS"))
+} else {
+  
+summary_mmollusca <- HMSCsummary(mmollusca)
+
+  saveRDS(summary_mmollusca, file = here("outputs", "summary_mmollusca.RDS"))
+}
+```
+
+```{r HSMCsummary}
+if (file.exists(here("outputs", "summary_marthro.RDS"))) {
+  summary_marthro <- readRDS(here("outputs", "summary_marthro.RDS"))
+} else {
+  
+summary_marthro <- HMSCsummary(marthro)
+
+  saveRDS(summary_marthro, file = here("outputs", "summary_marthro.RDS"))
+}
+```
+
+
+
+The models struggle to converge, especially for random effects. (Note that this is already with more iterations than in the original model, more thinning, but increasing farther does not change things)(neither does changing correlation matrix priors from the original model)(Note that this is also by removing sites where no species of the target phylum _ within the 50 species set_ are found, but keeping them also does not change things regarding convergence or the qualitative interpretation of phylogenetic signal CI95%)
+
+
+```{r splot-diags}
+summary_relettered <- summary_mmollusca |> # here for mollusca, but can replace by arthro
+  mutate(fixed_or_random = case_when(
+    parameter_type %in% c("Beta", "V", "Rho", "Gamma") ~ "fixed effects (L^F^)",
+    parameter_type %in% c("Alpha", "Delta", "Eta", "Lambda", "Omega", "Psi") ~ "random effects (L^R^)",
+    TRUE ~ "&Sigma;"
+  )) |>
+  mutate(
+    parameter_type = case_when(
+      parameter_type %in% c("Beta", "Delta", "Rho") ~
+        paste0("&", str_to_lower(parameter_type), ";"),
+      parameter_type == "Psi" ~
+        "&Phi;", # what is named as Psi in code seems to be Phi in book, TBC
+      parameter_type %in% c("Eta", "Gamma", "Lambda", "Omega", "Sigma", "Alpha") ~
+        paste0("&", parameter_type, ";"),
+      TRUE ~ parameter_type
+    ) # V is the only type with a Roman letter
+  )
+
+
+p_bulk <- summary_relettered |> filter(!is.na(ess_bulk)) |> # slot sigma is NA for probit models
+  ggplot() +
+  geom_boxplot(aes(parameter_type, ess_bulk)) +
+  geom_hline(yintercept = 400, linetype = 2) +
+  scale_x_discrete("") +
+  scale_y_continuous("*ESS<sub>bulk</sub>*", limits = c(0, 5000)) +
+  facet_grid(cols = vars(fixed_or_random), scales = "free_x", space = "free_x") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_markdown(),
+    axis.text.y = element_markdown(),
+    strip.text = element_markdown(),
+    title = element_markdown(),
+  )
+
+p_tail <- summary_relettered |>
+  filter(!is.na(ess_tail)) |>
+  ggplot() +
+  geom_boxplot(aes(parameter_type, ess_tail)) +
+  geom_hline(yintercept = 400, linetype = 2) +
+  scale_x_discrete("") +
+  scale_y_continuous("*ESS<sub>tail</sub>*", limits = c(0, 5000)) +
+  facet_grid(cols = vars(fixed_or_random), scales = "free_x", space = "free_x") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_markdown(),
+    axis.text.y = element_markdown(),
+    strip.text = element_markdown(),
+    title = element_markdown(),
+  )
+
+p_rhat <- summary_relettered |>
+  filter(!is.na(rhat)) |>
+  ggplot() +
+  geom_boxplot(aes(parameter_type, rhat)) +
+  geom_hline(yintercept = 1.01, linetype = 2) +
+  scale_x_discrete("Parameter type") +
+  scale_y_continuous(expression(italic(widehat(R)))) +
+  facet_grid(cols = vars(fixed_or_random), scales = "free_x", space = "free_x") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_markdown(),
+    strip.text = element_markdown()
+  )
+
+
+p_diag <- (
+  (p_bulk / p_tail / p_rhat)
+) +
+  plot_layout(axis_titles = "collect")
+
+p_diag
+```
+
+Let's have a look at the phylogenetic signal values nonetheless
+
+```{r phylosignal}
+summary_marthro |>
+  filter(parameter_type == "Rho")
+```
+
+
+```{r phylosignal}
+summary_mmollusca |>
+  filter(parameter_type == "Rho")
+```

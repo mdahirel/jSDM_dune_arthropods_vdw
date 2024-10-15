@@ -58,13 +58,37 @@ Eta_correlogs <- readRDS(here("outputs", "Eta_correlogs.RDS"))
 
 This plot will be put on the side of many others to illustrate potential phylogenetic patterns
 
-```{r tree-for-plots}
-tree_for_plot <- mfull$phyloTree
+```{r prep-tree-for-plots}
+raw_tree <- read.tree(here("data", "trees", "tree_relabeled_with_singletons.newick"))
+relabeled_tree <- raw_tree |>
+  compute.brlen(method = "Grafen")
 
-tree_for_plot$tip.label <- paste0("*", mfull$phyloTree$tip.label, "*") |>
+relabeled_tree$tip.label <- str_replace_all(relabeled_tree$tip.label, "_", " ")
+
+relabeled_tree$tip.label <- paste0("*", relabeled_tree$tip.label, "*") |>
   str_replace("_", " ")
 
-p_tree <- ggtree(tree_for_plot)
+annotations <- data.frame(
+  node = c(
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Gastropoda"),
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Araneae"),
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Hemiptera"),
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Hymenoptera"),
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Coleoptera"),
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Diptera"),
+    length(relabeled_tree$tip.label) + which(relabeled_tree$node.label == "Myriapoda")
+  ),
+  taxon = c("Gastropoda", "Araneae", "Hemiptera", "Hymenoptera", "Coleoptera", "Diptera", "Myriapoda")
+)
+```
+
+```{r tree-for-plots}
+p_tree <- ggtree(relabeled_tree) +
+  geom_highlight(data = annotations, aes(node = node, fill = taxon)) +
+  geom_tree() + ## we replot the tree over the highlight+
+  scale_fill_brewer("", palette = "Dark2") +
+  scale_colour_brewer("", palette = "Dark2") +
+  theme(legend.position = "none")
 ```
 
 # Occurrence predictions
@@ -181,7 +205,8 @@ p_V <- ggplot(varpart) +
     axis.text.y = element_markdown()
   )
 
-p_VC <- (p_tree | p_V) + plot_layout(widths = c(0.2, 0.8), guides = "collect") & theme(legend.position = "bottom")
+
+p_VC <- (p_tree | p_V + theme(legend.position = "bottom")) + plot_layout(widths = c(0.2, 0.8))
 ```
 
 ```{r save-varpart-plot}
