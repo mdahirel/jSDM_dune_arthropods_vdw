@@ -206,7 +206,8 @@ p_V <- ggplot(varpart) +
   )
 
 
-p_VC <- (p_tree | p_V + theme(legend.position = "bottom")) + plot_layout(widths = c(0.2, 0.8))
+
+p_VC <- (p_tree+ guides(fill="none") | p_V ) + plot_layout(widths = c(0.2, 0.8),guides="collect")& theme(legend.position = "bottom")
 ```
 
 ```{r save-varpart-plot}
