@@ -38,6 +38,8 @@ conflicted::conflict_prefer_all("purrr", quiet = TRUE) # avoid a map() conflict 
 conflicted::conflict_prefer_all("dplyr", quiet = TRUE)
 ```
 
+A note on nomenclature: in the data and the model, the different biogeographic areas are named 'districts', following Dutch nomenclature: https://nl.wikipedia.org/wiki/Floradistrict. Following a reviewer's comment, we rename them to "biogeographic areas" here in the plots
+
 
 ```{r read_outputs}
 mfull <- readRDS(here("outputs", "mfull.RDS"))
@@ -112,55 +114,6 @@ summary_mfull |>
 ```
 
 
-# Figure 3: model performance metrics
-
-```{r perfplot}
-fitmetrics <- tjur_CVfull$tjurD_per_species |>
-  select(species, TjurD, D.lower = .lower, D.upper = .upper) |>
-  left_join(
-    PRAUC_CVfull$AUC_per_species |>
-      select(species, AUC, AUC.lower = .lower, AUC.upper = .upper)
-  ) |>
-  left_join(occ_mfull$occ |> select(species, occurrence_obs)) |>
-  mutate(species = paste0("*", species, "*") |>
-    str_replace("_", " ")) |>
-  mutate(species = fct_relevel(as.factor(species), rev(get_taxa_name(p_tree))))
-
-p_tjurD <- ggplot(fitmetrics) +
-  geom_segment(aes(y = species, x = D.lower, xend = D.upper, col = D.lower > 0), linewidth = 3) +
-  scale_colour_manual(values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340")) +
-  geom_point(aes(y = species, x = TjurD)) +
-  scale_y_discrete(name = "") +
-  scale_x_continuous(name = "Tjur's *D*") +
-  theme_bw() +
-  theme(
-    axis.text.y = element_markdown(),
-    axis.title.x = element_markdown(), legend.position = "none"
-  )
-
-p_auc <- ggplot(fitmetrics) +
-  geom_segment(aes(y = species, x = AUC.lower, xend = AUC.upper, col = AUC.lower > occurrence_obs), linewidth = 3) +
-  scale_colour_manual(values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340")) +
-  geom_segment(aes(
-    y = as.numeric(species) - 0.5, yend = as.numeric(species) + 0.5,
-    x = occurrence_obs, xend = occurrence_obs
-  )) +
-  geom_point(aes(y = species, x = AUC)) +
-  scale_y_discrete(name = "") +
-  scale_x_continuous(name = "AUC-PR") +
-  theme_bw() +
-  theme(
-    axis.text.y = element_markdown(),
-    axis.title.x = element_markdown(), legend.position = "none"
-  )
-
-p_perf <- (p_tree | p_tjurD | p_auc) + plot_layout(widths = c(0.15, 0.42, 0.42), axes = "collect")
-```
-
-
-```{r save-perfplot}
-ggsave(filename = here("plots", "Fig3_performance.pdf"), plot = p_perf, device = cairo_pdf, width = 7.5, height = 6)
-```
 
 # Figure 4: variation partitioning
 
@@ -195,9 +148,12 @@ p_V <- ggplot(varpart) +
     breaks = c(
       "Local environmental variables", "District",
       "Random effects (sample)"
+    ),labels = c(
+      "Local environmental variables", "Biogeographical area",
+      "Random effects (sample)"
     )
   ) +
-  guides(fill = guide_legend(nrow = 1)) +
+  guides(fill = guide_legend(nrow = 2)) +
   theme_bw() +
   theme(
     legend.position = "bottom",
@@ -303,7 +259,7 @@ p_beta_district <- ggplot(betas_district) +
   geom_vline(xintercept = 0, linetype = 2) +
   facet_grid(cols = vars(coef)) +
   coord_cartesian(xlim = c(-5, 2)) +
-  ggtitle(label = "District-level contrasts (vs. reference level: Flemish dunes)") +
+  ggtitle(label = "Biogeographical area-level contrasts (vs. reference level: Flemish dunes)") +
   theme_bw() +
   theme(axis.text.y = element_markdown(), legend.position = "none")
 ```
@@ -476,7 +432,7 @@ p_gamma1 <- ggplot(gammas_district) +
   scale_x_continuous("Posterior coefficient (mean and 95% credible interval)") +
   geom_vline(xintercept = 0, linetype = 2) +
   facet_grid(cols = vars(coef)) +
-  ggtitle(label = "District-level contrasts (vs. reference level: Flemish dunes)") +
+  ggtitle(label = "Biogeographical area-level contrasts (vs. reference level: Flemish dunes)") +
   theme_bw() +
   theme(axis.text.y = element_markdown(), legend.position = "none")
 ```
@@ -671,7 +627,58 @@ p_diag <- (
 ggsave(filename = here("plots", "Splot_model_diagnostics.pdf"), plot = p_diag, device = cairo_pdf, width = 6, height = 8)
 ```
 
-## logOR of AUC-PR vs random baseline
+
+## model performance metrics, part 1
+
+```{r perfplot}
+fitmetrics <- tjur_CVfull$tjurD_per_species |>
+  select(species, TjurD, D.lower = .lower, D.upper = .upper) |>
+  left_join(
+    PRAUC_CVfull$AUC_per_species |>
+      select(species, AUC, AUC.lower = .lower, AUC.upper = .upper)
+  ) |>
+  left_join(occ_mfull$occ |> select(species, occurrence_obs)) |>
+  mutate(species = paste0("*", species, "*") |>
+    str_replace("_", " ")) |>
+  mutate(species = fct_relevel(as.factor(species), rev(get_taxa_name(p_tree))))
+
+p_tjurD <- ggplot(fitmetrics) +
+  geom_segment(aes(y = species, x = D.lower, xend = D.upper, col = D.lower > 0), linewidth = 3) +
+  scale_colour_manual(values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340")) +
+  geom_point(aes(y = species, x = TjurD)) +
+  scale_y_discrete(name = "") +
+  scale_x_continuous(name = "Tjur's *D*") +
+  theme_bw() +
+  theme(
+    axis.text.y = element_markdown(),
+    axis.title.x = element_markdown(), legend.position = "none"
+  )
+
+p_auc <- ggplot(fitmetrics) +
+  geom_segment(aes(y = species, x = AUC.lower, xend = AUC.upper, col = AUC.lower > occurrence_obs), linewidth = 3) +
+  scale_colour_manual(values = c(`FALSE` = "lightgrey", `TRUE` = "#f1a340")) +
+  geom_segment(aes(
+    y = as.numeric(species) - 0.5, yend = as.numeric(species) + 0.5,
+    x = occurrence_obs, xend = occurrence_obs
+  )) +
+  geom_point(aes(y = species, x = AUC)) +
+  scale_y_discrete(name = "") +
+  scale_x_continuous(name = "AUC-PR") +
+  theme_bw() +
+  theme(
+    axis.text.y = element_markdown(),
+    axis.title.x = element_markdown(), legend.position = "none"
+  )
+
+p_perf <- (p_tree | p_tjurD | p_auc) + plot_layout(widths = c(0.15, 0.42, 0.42), axes = "collect")
+```
+
+
+```{r save-perfplot}
+ggsave(filename = here("plots", "Splot_performance.pdf"), plot = p_perf, device = cairo_pdf, width = 7.5, height = 6)
+```
+
+## model performance metrics, part 2: logOR of AUC-PR vs random baseline
 
 the random baseline for AUC-PR varies between species, as it is the observed prevalence. We can attempt to standardise by looking at the logit(AUC) - logit(prevalence) values
 

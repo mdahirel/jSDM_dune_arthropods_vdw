@@ -4,6 +4,8 @@ library(phytools)
 library(posterior)
 library(tidyverse)
 
+## an alternative version of phylogenetic signal, not used in current analysis
+
 HMSCphylosig <- function(Hmsc) {
   
   if(!("Hmsc" %in% class(Hmsc))){stop("input must be a model fitted with the Hmsc package")}

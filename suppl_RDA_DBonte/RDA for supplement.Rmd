@@ -1,0 +1,161 @@
+---
+title: "Multivariate analysis Endure data"
+author: "Dries Bonte"
+date: "2024-10-10"
+output: word_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Multivariate analysis on species abundances
+
+The manuscript by Van De Walle *et al.*. received reviewer comments as part of the PCI-Ecology recommendation process (preprint: https://doi.org/10.1101/2024.06.24.600350). The JSDM was only performed on a selection of the 50 most common species and only incorporating presence/absence data as inflated zero abundances give rise to convergence problems. To maximise data-use, we therefore added a multivariate analysis based on abundance data of an enlarged dataset. Also for this analysis, we only worked with the most common species (>15 individuals in a total set of 583 samples).
+
+##Data and package loading
+```{r dataloading, echo=FALSE, message=FALSE, results=FALSE}
+library(vegan)
+library(ggplot2)
+library(dplyr)
+library(here)
+
+species <- read.table(here("suppl_RDA_DBonte","species_abundances_wide.txt"), sep = '\t', header=TRUE)
+env <- read.table(here("suppl_RDA_DBonte","data_env.txt"), sep='\t',  header=TRUE)
+
+#remove sum row & column
+lastrow<-nrow(species)
+species<-species[-c(lastrow),]
+
+lastcolumn<-ncol(species)
+species<-species[,1:(lastcolumn-1)]
+
+#set species columns according to threshold minimal_species_abundance
+#15 is the minimum for avoiding redundant distance measures
+
+minimal_species_abundance <- 15
+species<-species[, which(colSums(species[,2:ncol(species)]) > minimal_species_abundance)]
+
+
+joined_df <- merge(env, species, by = "sample_ID")
+
+#remove potential NAs
+complete.cases(joined_df) 
+summary(joined_df)
+
+
+#remove empty rows
+ncol(joined_df)
+somrij<-rowSums(joined_df[, 14:ncol(joined_df)-1])
+#print(somrij)
+joined_df<-joined_df[somrij>0,]
+
+
+# Split combined data back into species data and environmental data
+lastcolumn<-ncol(joined_df)
+species_data_complete <- joined_df[, 13:lastcolumn] 
+
+#only first 10rows env data are important
+env_data <- joined_df[, 1:10]
+#summary(species_data_complete)
+
+#na.omit(species_data_complete)
+#complete.cases(species_data_complete) 
+```
+
+## RDA analysis and visualisation
+
+```{r RDA, echo=FALSE}
+# Perform RDA
+#rda_result <- rda(species_data_complete ~ urbanization + proportion_50 + mt_stat_50 + vitality + X + Y, data = env_data)
+
+
+#without urbanisation since this showed to be a correlated parameter with cover of Marram grass at the transect level, not used in the JSDM as well for similar reasons
+rda_result <- rda(species_data_complete ~ proportion_50 + mt_stat_50 + vitality + X + Y, data = env_data)
+
+
+
+# First inspection of plot
+plot(rda_result)
+
+
+
+
+
+# Get RDA scores for pretty plotting
+scores <- scores(rda_result, display = "sites")
+env_scores <- scores(rda_result, display = "bp")
+
+env_scores
+scores
+
+# Prepare data frames for plotting
+rda_df <- data.frame(RDA1 = scores[, 1], RDA2 = scores[, 2], 
+                     District = as.factor(env_data$district))
+
+env_scores_df <- as.data.frame(env_scores)
+env_scores_df$Variable <- c("Marram cover","Marram Moran's I","Marram vitality","Longitude","Latitude")
+
+#select only data for continuos predictors
+env_scores_df <- env_scores_df[1:6,]
+env_scores_df
+env_scores_df$RDA1 <- env_scores_df$RDA1*4
+env_scores_df$RDA2 <- env_scores_df$RDA2*4
+# Modify Variable column to show desired labels
+#env_scores_df$Variable <- gsub("River", "", env_scores_df$Variable)
+#env_scores_df$Variable <- gsub("Method", "", env_scores_df$Variable)
+
+# Extract variation explained to annotate axis labels
+variation_explained <- round(rda_result$CA$eig[1:2] / sum(rda_result$CA$eig) * 100, 2)
+print(variation_explained)
+
+# Create the combined plot
+combined_plot <- ggplot() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey") +  # Add dashed grey line for y = 0
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey") +  # Add dashed grey line for x = 0
+  geom_point(data = rda_df, aes(x = RDA1, y = RDA2, color = District), alpha = 0.6) +  # Set alpha for transparency and size for distance
+  geom_point(data = env_scores_df, aes(x = RDA1, y = RDA2), color = "black", shape = 18, size = 4, alpha = 0.5) +  # Display centroids of variables 
+  geom_text(data = env_scores_df, aes(x = RDA1, y = RDA2, label = Variable), size = 4, vjust = 1.5) +
+  labs(x = paste0("RDA1 (", variation_explained[1], "%)"),  
+       y = paste0("RDA2 (", variation_explained[2], "%)"),  
+       color = "District") +
+  #scale_shape_manual(values = c(16, 17, 18), labels = c("Barbierbeek", "Herk", "Berwinne")) +  
+  #scale_color_manual(values = c("blue", "deeppink4")) +  #include colours for variable 'Method'
+  #scale_size_continuous(name = "Distance", range = c(3, 8), breaks = c(1000, 10000)) +  # Adjust size values for better differentiation in symbol sizes
+  coord_fixed(ratio = 1) +  # Ensure equal scaling for x and y axes
+  xlim(-4, 4) +
+  ylim(-4, 4) + 
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+        axis.title = element_text(size = 17),
+        axis.text = element_text(size = 15))
+
+# Print the combined plot
+print(combined_plot)
+
+# Print RDA summary
+summary(rda_result)
+
+#exported as 800 800 
+```
+
+## Variance partitioning using permanova
+We use a complex design with nested factors (transects in regions, local marram variables within transects) and follow a sequential SS (typeI) to ensure each term is fitted after the previous one. In such a way, permanova mimics to the best the random design implemented in the JSDM. For local variables, we chose to fit vitality before the spatial variables, but in the end it does not matter for the variance partitioning. Permutations within strata 'transect' are included but are kind of redundant with the nested design. 
+
+PERMANOVA analysis demonstrated the overall importance of biogeography as the most important explaining variable of the community structure (<!--this and next results may be subject to minor randomization variations when re-run--> R²=12%; Pseudo-F=18.35; df=5, P<0.001), but also the strong transect-dependent variation within the latter regions (R²=18%; Pseudo-F=3.88; df=38, P<0.001).  Additional variation was explained by the vitality (R²=7 %, Pseudo-F=1.29, df=43, P<0.001), cover (R²=7 %, Pseudo-F=1.24, df=44, P<0.001) and clustering (R²=6 %, Pseudo-F=1.13,  df=43, P=0.003) of the marram grass tussocks. 
+```{r permanova, echo=FALSE}
+distbb=vegdist(species_data_complete, "bray")
+
+#first a test to 
+#test1<-adonis2(distbb ~ factor(env_data$district)+env_data$X+env_data$Y+env_data$proportion_50+env_data$mt_stat_50+env_data$vitality, strata=env_data$transect , permutations=999)
+#test2<-adonis2(distbb ~ factor(env_data$district)+env_data$proportion_50+env_data$mt_stat_50+env_data$vitality, strata=env_data$transect, permutations=999)
+
+
+permaov <- adonis2(distbb ~ factor(env_data$district)+factor(env_data$transect) %in% factor(env_data$district)+env_data$vitality %in% factor(env_data$transect) +env_data$proportion_50 %in% factor(env_data$transect) +env_data$mt_stat_50 %in% factor(env_data$transect) , strata=env_data$transect
+        , permutations=999, by="terms")
+
+permaov
+```
