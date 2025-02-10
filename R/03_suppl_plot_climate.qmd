@@ -46,7 +46,7 @@ p_clim <- data_clim |>
   ggplot()+
   geom_boxplot(aes(district,value))+
   scale_y_continuous("")+
-  scale_x_discrete("Biogeographical area")+
+  scale_x_discrete("Biogeographic sector")+
   facet_wrap(~name,scales = "free_y",ncol=2)+
   theme_bw() + 
   theme(axis.text.x = element_text(angle=45,vjust=1,hjust=1))

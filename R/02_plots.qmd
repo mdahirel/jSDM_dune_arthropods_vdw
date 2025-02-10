@@ -38,7 +38,7 @@ conflicted::conflict_prefer_all("purrr", quiet = TRUE) # avoid a map() conflict 
 conflicted::conflict_prefer_all("dplyr", quiet = TRUE)
 ```
 
-A note on nomenclature: in the data and the model, the different biogeographic areas are named 'districts', following Dutch nomenclature: https://nl.wikipedia.org/wiki/Floradistrict. Following a reviewer's comment, we rename them to "biogeographic areas" here in the plots
+A note on nomenclature: in the data and the model, the different biogeographic sectors were named 'districts', following Dutch nomenclature: https://nl.wikipedia.org/wiki/Floradistrict. Following reviewer comments, we rename them to "biogeographic sectors" here in the plots
 
 
 ```{r read_outputs}
@@ -149,7 +149,7 @@ p_V <- ggplot(varpart) +
       "Local environmental variables", "District",
       "Random effects (sample)"
     ),labels = c(
-      "Local environmental variables", "Biogeographical area",
+      "Local environmental variables", "Biogeographic sector",
       "Random effects (sample)"
     )
   ) +
@@ -259,7 +259,7 @@ p_beta_district <- ggplot(betas_district) +
   geom_vline(xintercept = 0, linetype = 2) +
   facet_grid(cols = vars(coef)) +
   coord_cartesian(xlim = c(-5, 2)) +
-  ggtitle(label = "Biogeographical area-level contrasts (vs. reference level: Flemish dunes)") +
+  ggtitle(label = "Biogeographic sector-level contrasts (vs. reference level: Flemish dunes)") +
   theme_bw() +
   theme(axis.text.y = element_markdown(), legend.position = "none")
 ```
@@ -432,7 +432,7 @@ p_gamma1 <- ggplot(gammas_district) +
   scale_x_continuous("Posterior coefficient (mean and 95% credible interval)") +
   geom_vline(xintercept = 0, linetype = 2) +
   facet_grid(cols = vars(coef)) +
-  ggtitle(label = "Biogeographical area-level contrasts (vs. reference level: Flemish dunes)") +
+  ggtitle(label = "Biogeographic sector-level contrasts (vs. reference level: Flemish dunes)") +
   theme_bw() +
   theme(axis.text.y = element_markdown(), legend.position = "none")
 ```
